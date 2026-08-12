@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="he" dir="ltr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zmanim Screen</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@300;400;700&family=Heebo:wght@300;400;500&family=DM+Mono:wght@400;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ical.js@1.5.0/build/ical.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/icalendar@6.1.9/index.global.min.js"></script>
+    <script src="/app.js" defer></script>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+    <div class="header-left">
+        <p id="date"></p>
+        <p id="hebrew-date" class="hebrew-date"></p>
+    </div>
+    <h1 class="family-name">
+        <span id="mishpachas-word">משפחת</span> <span id="family-name-text">אטיאס</span>
+    </h1>
+</header>
+
+<!-- MAIN 3-COLUMN GRID -->
+<main class="main-grid">
+
+    <!-- LEFT: Zmanim -->
+    <div class="left-col">
+        <div class="section-header">
+            <p class="zmanimTitle">Zmanim</p>
+        </div>
+        <div id="zmanim" class="zmanim-list"></div>
+    </div>
+
+    <!-- CENTER: Clock + Date + Photo -->
+    <div class="center-col">
+        <div class="topDivider"></div>
+        <div class="clock-row">
+            <p id="clock" class="clock"></p>
+            <p id="time-of-day" class="time-of-day"></p>
+        </div>
+        <div class="bottomDivider"></div>
+        <div class="photo-container">
+            <div class="photo-inner">
+                <div class="photo-backdrop" id="photo-backdrop"></div>
+                <img id="family-photo" src="">
+                <div class="photo-frame-shadow"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT: Daf Yomi + Parasha + Calendar -->
+    <div class="right-col">
+
+        <div class="events-row">
+            <div class="daf-yomi-box">
+                <p class="box-label">Daf Yomi</p>
+                <p id="daf-yomi-he" class="large-hebrew"></p>
+                <p id="daf-yomi-en" class="box-subtitle"></p>
+            </div>
+
+            <div class="parasha-box">
+                <p id="parasha" class="large-hebrew"></p>
+                <div class="shabbos-times">
+                    <div class="shabbos-item">
+                        <p class="shabbos-label">Candle Lighting</p>
+                        <p id="candle-lighting-time" class="shabbos-time"></p>
+                    </div>
+                    <div class="shabbos-item">
+                        <p class="shabbos-label">Havdalah</p>
+                        <p id="havdalah-time" class="shabbos-time"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="calendar"></div>
+
+        <!--        <div class="filler"></div>-->
+
+    </div>
+
+</main>
+
+<!-- FOOTER -->
+<footer class="footer">
+    <div class="weather">
+        <div class="weather-temp-row">
+            <p id="temperature" class="temperature"></p>
+            <span id="feels-like" class="feels-like"></span>
+        </div>
+        <p id="weather-condition" class="weather-condition"></p>
+    </div>
+
+    <!-- Trigger/Open The Modal -->
+    <button id="settingsBtn" class="settingsButton">
+        <img src="/images/settings-icon.png" alt="Settings" width="32" height="32" />
+    </button>
+
+    <!-- The Modal -->
+    <div id="myModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 class="modal-title">Settings</h2>
+
+            <form id="settingsForm">
+                <div class="settings-field">
+                    <label for="mishpachasInput">Mishpachas word (Hebrew)</label>
+                    <div class="settings-input-row">
+                        <input type="text" id="mishpachasInput" dir="rtl" class="hebrew-input" maxlength="20" />
+                        <button type="button" class="kb-toggle" data-target="mishpachasInput">א</button>
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <label for="familyNameInput">Family name (Hebrew)</label>
+                    <div class="settings-input-row">
+                        <input type="text" id="familyNameInput" dir="rtl" class="hebrew-input" maxlength="20" />
+                        <button type="button" class="kb-toggle" data-target="familyNameInput">א</button>
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <label for="zipInput">Zip code</label>
+                    <input type="text" id="zipInput" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" />
+                </div>
+
+                <div class="settings-field">
+                    <label for="havdalahInput">Minutes after shkiah for havdalah</label>
+                    <input type="number" id="havdalahInput" min="0" max="120" />
+                </div>
+
+                <div class="settings-field">
+                    <label for="photoInput">Family photo</label>
+                    <div class="photo-upload-row">
+                        <img id="photoPreview" class="photo-preview" alt="" />
+                        <label for="photoInput" class="photo-upload-btn">Choose File</label>
+                        <input type="file" id="photoInput" accept="image/*" class="visually-hidden-file-input" />
+                    </div>
+                </div>
+
+                <div id="hebrewKeyboard" class="hebrew-keyboard" hidden></div>
+
+                <div class="settings-actions">
+                    <span id="settingsStatus" class="settings-status"></span>
+                    <button type="submit" class="settings-save-btn">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</footer>
+<!-- Calendar script -->
+<script>
+    function formatAmPm(date) {
+        // "4:39 AM" -> "4:39am"
+        return date.toLocaleTimeString("en-US", {
+            hour: "numeric", minute: "2-digit", hour12: true
+        }).replace(" ", "").toLowerCase();
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const calendarEl = document.getElementById('calendar');
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            showNonCurrentDates: false,
+            fixedWeekCount: false,
+            headerToolbar: { left: '', center: 'title', right: '' },
+            eventDisplay: 'block',
+            eventClassNames: function(arg) {
+                console.log(arg.event.title, arg.event.start);
+                const title = arg.event.title.toLowerCase();
+                if ((title.includes('chag habanot')) || (title.includes('labeheimos'))) return ['hidden-event'];
+                if (title.includes('candle lighting')) return ['candles'];
+                if (title.includes('havdalah'))        return ['havdalah'];
+                if (title.includes('parshas') || title.includes('parashat')) return ['parashat'];
+                if (title.includes('rosh chodesh'))    return ['roshchodesh'];
+                if (title.includes('mevorchim') || title.includes('mevarchim')) return ['mevarchim'];
+                if (title.includes('omer')) return ['omer'];
+                if (title.includes('fast begins') || title.includes('fast ends') ||
+                    title.includes('finish eating') || title.includes('biur chametz') ||
+                    title.includes('tzom') || title.includes("ta'anis") ||
+                    title.includes('tisha') || title.includes('asara')) return ['holiday', 'fast'];
+                if (title.includes('chanukah') || title.includes('pesach') ||
+                    title.includes('sukkos') || title.includes('shavuos') ||
+                    title.includes('rosh hashana') || title.includes('yom kippur') ||
+                    title.includes('shmini') || title.includes('simchas')) return ['holiday', 'major'];
+                return ['holiday', 'minor'];
+            },
+            eventContent: function(arg) {
+                const title = arg.event.title;
+                const start = arg.event.start;
+                const lower = title.toLowerCase();
+                const isTimedEvent = start && start.getHours() !== 0;
+
+                // Omer — compact, no bubble, reformatted as "Omer - Day N"
+                if (lower.includes('omer') && !(lower.includes('lag'))) {
+                    const match = title.match(/(\d+)/);
+                    const dayNum = match ? match[1] : '';
+                    return { html: `<div class="omer-event"><span class="omer-event-title">Omer - Day ${dayNum}</span></div>` };
+                }
+
+                if (isTimedEvent) {
+                    const time = formatAmPm(start);
+                    const isChanukahCandle = lower.includes('chanukah') && lower.includes('candle');
+                    const isShabbatCandles = lower.includes('candle') && !isChanukahCandle;
+                    const isHavdalah = lower.includes('havdalah');
+
+                    // Chanukah nights — keep the bubble, add the time alongside the title
+                    if (isChanukahCandle) {
+                        return { html: `<div class="event-bubble"><span class="event-text"> ${title} · <span class="no-wrap">🕎 ${time}</span> </span></div>` };
+                    }
+
+                    if (isShabbatCandles || isHavdalah) {
+                        const emoji = isShabbatCandles ? '🕯🕯 ' : '🔥';
+                        return { html: `<div class="timed-event"><span class="timed-event-time">${emoji}${time}</span></div>` };
+                    }
+
+                    // Everything else (chametz cutoff, fast begins/ends, etc.) — show text too
+                    return {
+                        html: `<div class="timed-event">
+                 <span class="timed-event-time">${time}</span>
+                 <span class="timed-event-title">${title}</span>
+               </div>`
+                    };
+                }
+
+                // Untimed events — standard bubble
+                return { html: `<div class="event-bubble"><span class="event-text">${title}</span></div>` };
+            },
+
+            events: {
+                url: '/api/calendar',
+                format: 'ics',
+                cache: true
+            }
+        });
+
+        calendar.render();
+        window.zmanimCalendar = calendar; // expose so app.js can refetch after settings changes
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowLeft'  && !e.metaKey) calendar.prev();
+            if (e.key === 'ArrowRight' && !e.metaKey) calendar.next();
+        });
+    });
+</script>
+
+</body>
+</html>

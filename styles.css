@@ -1,0 +1,820 @@
+/* ── Reset ── */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* ── Tokens ── */
+:root {
+    --green: #c9a84c;
+    --green-dim: rgba(5, 150, 105, 0.6);
+--dark:      #0F172A;
+--grey:      #6B7280;
+--border:    #0F172A;
+--font-he:   'Frank Ruhl Libre', serif;
+--font-en:   'Heebo', sans-serif;
+--font-mono: 'DM Mono', monospace;
+}
+
+/* ── Base ── */
+html, body {
+    height: 100%;
+    color: var(--dark);
+    font-family: var(--font-en);
+}
+
+html {
+    background-image: url("/images/background.jpg");
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: left;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+p {
+    font-size: 0.84rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--dark);
+}
+
+/* ── Header ── */
+.header {
+    display: flex;
+    flex: 1;
+    justify-content: space-between;
+    align-items: center;
+    /*border-bottom: 1px solid var(--border);*/
+    padding: 0.5rem 1.25rem;
+}
+
+.header-left{
+    display: flex;
+    flex-direction: column;
+}
+
+.hebrew-date{
+    text-align: left;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+}
+
+.header-left,
+.header-right {
+    flex: 1;
+}
+
+.family-name {
+    flex: 1;
+    text-align: right;
+    font-family: var(--font-he);
+    font-size: clamp(2rem, 4vw, 4rem);
+    font-weight: 700;
+    color: rgb(201, 168, 76, 0.7);
+    direction: rtl;
+    letter-spacing: 0;
+}
+
+/* ── Main grid ── */
+.main-grid {
+    display: flex;
+    flex: 15;
+    border-bottom: 1px solid var(--border);
+}
+
+/* ── Left column: Zmanim ── */
+.left-col {
+    display: flex;
+    flex-direction: column;
+    flex: 1.4;
+}
+
+.section-header {
+    display: flex;
+    justify-content: center;
+    padding: 0.5rem 1.25rem;
+}
+
+.zmanimTitle{
+    font-size: 1.45em;
+    font-weight: 300;
+    margin-bottom: -10px;
+}
+
+.hebrew-label {
+    font-family: var(--font-he);
+    font-size: 1.1rem;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    text-transform: none;
+    direction: rtl;
+}
+
+.zmanim-list {
+    display: flex;
+    flex-direction: column;
+    padding: 0.4rem 1.25rem;
+    gap: 3px;
+}
+
+.zman-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.3rem 1.25rem;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    border: 2px solid var(--border);
+}
+
+.zman-row.zman-upcoming {
+    background-color: rgba(245, 245, 220, 0.3);
+    border-color: var(--dark);
+}
+
+.zman-time,
+.zman-he {
+    font-family: var(--font-he);
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--dark);
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.zman-time {
+    font-family: var(--font-mono);
+}
+
+/* ── Center column ── */
+.center-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 0.3rem 0.3rem;
+    gap: 0.5rem;
+    flex: 3.5;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.hebrew-date {
+    font-family: var(--font-he);
+    font-size: 1.5rem;
+    font-weight: 300;
+    color: var(--dark);
+    direction: rtl;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.topDivider, .bottomDivider {
+    width: 70%;
+    height: 3px;
+    background: var(--border);
+    flex-shrink: 0;
+}
+
+.bottomDivider{
+    margin-bottom: 20px;
+}
+
+.clock-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+}
+
+.clock {
+    font-family: var(--font-mono);
+    font-size: clamp(3.5rem, 7.5vw, 8rem);
+    font-weight: 700;
+    color: var(--dark);
+    letter-spacing: 0;
+    text-transform: none;
+    /*margin-top: -15px;*/
+    /*margin-bottom: -15px;*/
+}
+
+.time-of-day {
+    font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+    color: var(--grey);
+    letter-spacing: 0.05em;
+}
+
+.photo-container {
+    position: relative;
+    align-self: center;
+    max-width: 100%;
+    flex: 1;
+    max-height: 50vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 0;
+
+    padding: 38px;
+    background: conic-gradient(
+            from -45deg,
+            #e8e8ea, #b7b9bd, #ffffff, #9a9ca1, #e8e8ea, #b7b9bd, #e8e8ea
+    ) ;
+    box-shadow:
+            inset 0 0 0 2px rgba(255,255,255,0.35),
+            inset 0 0 0 6px rgba(0,0,0,0.2),
+            0 6px 16px rgba(0,0,0,0.3);
+
+    will-change: transform;      /* hints browser: give this its own layer, always */
+    transform: translateZ(0);    /* forces GPU layer promotion even without will-change support */
+    contain: paint;              /* tells the browser this element's painting is self-contained */
+}
+
+.photo-inner {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.photo-backdrop {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    filter: blur(20px) brightness(0.8);
+    transform: scale(1.1);
+    z-index: 0;
+    display: none;
+}
+
+.photo-container img {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.photo-frame-shadow {
+    position: absolute;
+    inset: 0;
+    z-index: 2; /* above the img's z-index: 1 */
+    pointer-events: none; /* so it never intercepts clicks/taps meant for the photo */
+    box-shadow:
+            inset 0 4px 8px -2px rgba(0, 0, 0, 0.5),
+            inset 0 -4px 8px -2px rgba(0, 0, 0, 0.5),
+            inset 4px 0 8px -2px rgba(0, 0, 0, 0.5),
+            inset -4px 0 8px -2px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Right column ── */
+.right-col {
+    display: flex;
+    flex-direction: column;
+    flex: 2.5;
+    padding: 0.75rem 1.5rem 0.5rem;
+    gap: 0.75rem;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.events-row {
+    display: flex;
+    flex-shrink: 0;
+    gap: 0.75rem;
+}
+
+.daf-yomi-box,
+.parasha-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    text-align: center;
+    gap: 4px;
+    flex-shrink: 0;
+    background-color: rgba(173, 129, 33, 0.54);
+}
+
+.daf-yomi-box { flex: 1; }
+.parasha-box  { flex: 2; }
+
+.box-label {
+    color: var(--dark);
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+}
+
+.box-subtitle {
+    color: var(--dark);
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    text-transform: none;
+}
+
+.large-hebrew {
+    font-family: var(--font-he);
+    font-size: clamp(1.2rem, 2.2vw, 1.9rem);
+    font-weight: 700;
+    color: var(--dark);
+    direction: rtl;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.shabbos-times {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 4px;
+}
+
+.shabbos-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.shabbos-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    color: var(--dark);
+}
+.shabbos-time {
+    font-family: var(--font-mono);
+    font-size: clamp(0.85rem, 1.5vw, 1.1rem);
+    font-weight: 700;
+    color: var(--dark);
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* ── Calendar ── */
+#calendar {
+    flex: 3;
+    font-family: var(--font-en);
+    font-size: 14px;
+    height: auto;
+    flex-shrink: 1;
+    flex-grow: 0;
+    min-height: 0;
+}
+.fc .fc-scroller {
+    overflow: hidden !important;
+}
+
+.fc .fc-scroller-liquid-absolute {
+    position: relative !important;
+}
+
+/* ── Footer ── */
+.footer {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    padding: 0.5rem 1.25rem;
+    justify-content: space-between;
+}
+
+.weather {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.weather-temp-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.temperature {
+    font-family: var(--font-mono);
+    font-size: clamp(0.9rem, 2vw, 1.4rem);
+    font-weight: 700;
+    color: var(--green);
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.feels-like {
+    font-size: 0.75rem;
+    color: var(--grey);
+    text-transform: lowercase;
+}
+
+.weather-condition {
+    font-size: 0.75rem;
+    color: var(--grey);
+    letter-spacing: 0.05em;
+}
+.settingsButton {
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+    line-height: 0;        /* removes baseline-related spacing */
+    display: inline-flex;  /* button box now hugs the image exactly */
+    transform-origin: center; /* explicit, though this is already the default */
+    transition: transform 1s;
+    will-change: transform;
+    isolation: isolate; /* creates a new stacking context, further containing repaint scope */
+}
+
+.settingsButton img {
+    display: block; /* removes the inline baseline gap under the image */
+}
+
+.settingsButton:hover{
+    transform: rotate(180deg);
+}
+
+/*.filler { flex: 0.5; }*/
+
+/* ── FullCalendar overrides ── */
+.fc .fc-toolbar-title {
+    font-size: 1.75em;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 400;
+    margin-bottom: -10px;
+}
+
+.fc-event {
+    border-radius: 3px;
+    font-size: 0.75em;
+    line-height: 1.3;
+}
+.fc-event.hidden-event {
+    display: none !important;
+}
+.fc-direction-ltr .fc-daygrid-event.fc-event-end, .fc-direction-rtl .fc-daygrid-event.fc-event-start {
+    margin-right: 1px;
+    margin-left: 1px;
+}
+
+.fc .fc-scrollgrid-section > td {
+    border: none;
+}
+
+.fc .fc-scrollgrid td,
+.fc .fc-scrollgrid th {
+    border-right: none;
+}
+.fc-theme-standard .fc-scrollgrid {
+    border: 1px solid rgb(0, 0, 0);
+    border-radius: 8px;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th {
+    border: 1px solid rgb(0, 0, 0);
+}
+
+.fc .fc-daygrid-day.fc-day-today {
+    background-color: rgba(0, 0, 0, 0.22);
+}
+
+/* ── Colored event bubbles ── */
+.event-bubble {
+    width: 100%;
+    padding: 0 2px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+}
+
+.event-text {
+    display: inline-block;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    max-width: 100%;
+}
+
+/* ── Timed events (candle lighting, havdalah, fast times) ── */
+.timed-event {
+    display: block;
+    background: transparent !important;
+    padding: 0 2px;
+}
+
+.timed-event-time {
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: var(--dark);
+    letter-spacing: 0;
+}
+
+.timed-event-title {
+    font-size: 0.55rem;
+    font-weight: 400;
+    color: var(--dark);
+    margin-left: 3px;
+    white-space: normal;   /* was nowrap — this is what allows wrapping */
+}
+
+.fc-event:has(.timed-event) {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.fc .fc-daygrid-day-number {
+    padding: 2px;
+    position: relative;
+    z-index: 4;
+    padding-bottom: 0px;
+}
+
+.no-wrap {
+    white-space: nowrap;
+}
+
+/* ── Omer count — no bubble, sits level with the day number ── */
+.fc-daygrid-day-frame {
+    position: relative;
+    padding: 0 !important;
+}
+
+.fc-daygrid-day-events:has(.omer-event) {
+    position: absolute;
+    top: 3px;
+    left: 0.1px;
+    right: 22px;   /* leaves room so it doesn't run under the day number */
+    margin: 0 !important;
+}
+
+.fc-event:has(.omer-event) {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.omer-event {
+    padding: 0 !important;
+}
+
+.omer-event-title {
+    display: block;
+    font-size: 0.5rem;
+    font-weight: 500;
+    line-height: 1.1;
+    color: var(--dark);
+    white-space: normal;   /* allows wrapping onto a second line */
+    text-align: left;
+}
+
+/* ── Event category colors ── */
+.fc-event.parashat,
+.fc-event.parashat .fc-event-title {
+    background: #257e4a;
+    border-color: #257e4a;
+    color: #fff;
+}
+
+.fc-event.roshchodesh {
+    background: #6f42c1;
+    border-color: #6f42c1;
+    color: #fff;
+}
+.fc-event.holiday {
+    background: #3a87ad;
+    border-color: #3a87ad;
+    color: #fff;
+}
+
+.fc-event.fast {
+    background: #fd7e14;
+    border-color: #fd7e14;
+    color: #fff;
+}
+
+.fc-event.mevarchim {
+    background: #5a6e8a;
+    border-color: #5a6e8a;
+    color: #fff;
+}
+
+.fc-event.candles,
+.fc-event.havdalah {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* The Modal (background) */
+.modal {
+    display: none; /* Hidden by default — toggled to 'flex' via JS */
+    position: fixed;
+    z-index: 10; /* raised — make sure it sits above everything, including the calendar */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0,0,0,0.4);
+}
+
+/* Modal Content/Box */
+.modal-content {
+    background-color: #fefefe;
+    padding: 20px;
+    border: 1px solid #888;
+    border-radius: 8px;
+    width: min(90%, 420px);
+    max-height: 85vh;      /* never taller than the viewport */
+    overflow-y: auto;      /* scrolls internally if content is still too tall */
+}
+
+/* The Close Button */
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* ── Settings modal ── */
+.modal-title {
+    font-size: 1.1rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+}
+
+.settings-field {
+    margin-bottom: 1rem;
+}
+
+.settings-field label {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--grey);
+    margin-bottom: 0.35rem;
+}
+
+.settings-field input {
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    font-family: var(--font-en);
+    font-size: 0.95rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.hebrew-input {
+    font-family: var(--font-he);
+    font-size: 1.1rem;
+}
+
+.settings-input-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.settings-input-row input {
+    flex: 1;
+}
+
+.kb-toggle {
+    flex-shrink: 0;
+    width: 42px;
+    font-family: var(--font-he);
+    font-size: 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #f4f4f4;
+    cursor: pointer;
+}
+
+.kb-toggle.active {
+    background: rgba(173, 129, 33, 0.54);
+}
+
+.hebrew-keyboard {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background: #f4f4f4;
+    border-radius: 6px;
+}
+
+.hebrew-keyboard button {
+    font-family: var(--font-he);
+    font-size: 1rem;
+    padding: 0.5rem 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.hebrew-keyboard button:active {
+    background: rgba(173, 129, 33, 0.54);
+}
+
+.hebrew-keyboard .kb-wide {
+    grid-column: span 3;
+}
+
+.settings-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.settings-save-btn {
+    padding: 0.5rem 1.2rem;
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 6px;
+    background: var(--dark);
+    color: #fff;
+    cursor: pointer;
+}
+
+.settings-status {
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    text-transform: none;
+    color: var(--green);
+}
+
+.photo-upload-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.photo-preview {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #eee;
+    flex-shrink: 0;
+}
+
+.visually-hidden-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+.photo-upload-btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #f4f4f4;
+    cursor: pointer;
+    text-align: center;
+}
+
+.photo-upload-btn:active {
+    background: rgba(173, 129, 33, 0.54);
+}
+
+
+
+
