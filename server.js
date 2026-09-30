@@ -11,6 +11,9 @@ const DEFAULT_SETTINGS = {
     havdalahMinutes: 60,
     photoFilename: 'sample-family-photo.png',
     photoUpdatedAt: null,
+    driveFolderUrl: '',   // "anyone with the link" Google Drive folder to pull slideshow photos from
+    driveApiKey: '',      // Google Cloud API key with the Drive API enabled
+    slideSeconds: 10,     // how long each slideshow photo stays on screen
 };
 
 function loadSettings() {
@@ -128,7 +131,7 @@ async function refreshStaticData() {
         const converterData = await fetchAPI(`https://www.hebcal.com/converter?cfg=json&date=${today}&g2h=1&strict=1`);
         const hebrewDateObject = converterData.hebrew;
 
-        const zmanimData = await fetchAPI(`https://www.hebcal.com/zmanim?cfg=json&zip=${settings.zip}&date=${today}`);
+        const zmanimData = await fetchAPI(`https://www.hebcal.com/zmanim?cfg=json&zip=${settings.zip}&date=${today}&sec=1`);
         const zmanimObject = zmanimData.times;
         const location = {
             city: zmanimData.location.city,
@@ -239,6 +242,201 @@ async function refreshWeather() {
     }
 }
 
+// ── Google Drive photo sync ──
+// Mirrors the image files in a publicly shared Drive folder into images/drive/,
+// so the slideshow always plays from local disk and keeps working through
+// internet outages. A manifest records each file's modifiedTime so unchanged
+// photos aren't re-downloaded on every sync.
+const DRIVE_DIR = path.join(import.meta.dirname, 'images', 'drive');
+const DRIVE_MANIFEST_PATH = path.join(DRIVE_DIR, 'manifest.json');
+const DRIVE_DISPLAYABLE_MIME = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+
+let driveSyncStatus = { ok: null, message: 'Not synced yet', lastSyncAt: null };
+let driveSyncInProgress = false;
+let driveSyncQueued = false; // a settings change arrived mid-sync, so run again once it finishes
+
+// Accepts a full folder link (https://drive.google.com/drive/folders/<id>?usp=sharing),
+// an old-style ?id=<id> link, or a bare folder ID. Returns null if nothing usable is found.
+function parseDriveFolderId(input) {
+    const value = (input || '').trim();
+    if (!value) return null;
+    const match = value.match(/\/folders\/([A-Za-z0-9_-]+)/) || value.match(/[?&]id=([A-Za-z0-9_-]+)/);
+    if (match) return match[1];
+    return /^[A-Za-z0-9_-]{10,}$/.test(value) ? value : null;
+}
+
+function loadDriveManifest() {
+    try {
+        return JSON.parse(fs.readFileSync(DRIVE_MANIFEST_PATH, 'utf-8'));
+    } catch {
+        return {};
+    }
+}
+
+// Downloads a URL to a Buffer, rejecting anything that isn't an image (e.g. an
+// HTML error or sign-in page served with a 200).
+async function downloadImage(url) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // photos can be several MB
+    try {
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error(`Download failed (${res.status})`);
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.startsWith('image/')) throw new Error(`Unexpected content type: ${contentType}`);
+        return { buffer: Buffer.from(await res.arrayBuffer()), contentType };
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+// Drive API call that surfaces Google's own error text (e.g. "API key not
+// valid") rather than a status code — and never the request URL, which
+// contains the API key and would otherwise end up in logs and the settings panel.
+async function fetchDriveJSON(url) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    try {
+        const res = await fetch(url, { signal: controller.signal });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            throw new Error(`Google Drive (${res.status}): ${data.error?.message || res.statusText}`);
+        }
+        return data;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+async function listDriveFolderImages(folderId, apiKey) {
+    const files = [];
+    let pageToken = '';
+    do {
+        const q = encodeURIComponent(`'${folderId}' in parents and mimeType contains 'image/' and trashed = false`);
+        const fields = encodeURIComponent('nextPageToken,files(id,name,mimeType,modifiedTime,thumbnailLink)');
+        const data = await fetchDriveJSON(
+            `https://www.googleapis.com/drive/v3/files?q=${q}&fields=${fields}&pageSize=1000` +
+            `&supportsAllDrives=true&includeItemsFromAllDrives=true&key=${encodeURIComponent(apiKey)}` +
+            (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '')
+        );
+        files.push(...(data.files || []));
+        pageToken = data.nextPageToken || '';
+    } while (pageToken);
+    return files;
+}
+
+// Fetches one Drive image. Prefers Google's resized rendition (thumbnailLink with
+// a larger size suffix): it's a fraction of the original's size — much easier on
+// the Pi — and comes back as JPEG even for iPhone HEIC photos, which Chromium
+// can't display. Falls back to the original file if that rendition isn't available.
+async function downloadDriveImage(file, apiKey) {
+    if (file.thumbnailLink) {
+        try {
+            const sizedUrl = file.thumbnailLink.replace(/=s\d+$/, '') + '=s1920';
+            return await downloadImage(sizedUrl);
+        } catch (err) {
+            console.warn(`[${new Date().toISOString()}] Resized download failed for ${file.name}, trying original:`, err.message);
+        }
+    }
+    if (!DRIVE_DISPLAYABLE_MIME[file.mimeType]) {
+        throw new Error(`${file.mimeType} can't be displayed and no resized version was available`);
+    }
+    return downloadImage(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${encodeURIComponent(apiKey)}`);
+}
+
+async function syncDrivePhotos() {
+    if (driveSyncInProgress) {
+        driveSyncQueued = true;
+        return;
+    }
+    driveSyncInProgress = true;
+
+    try {
+        fs.mkdirSync(DRIVE_DIR, { recursive: true });
+        const manifest = loadDriveManifest();
+        const folderId = parseDriveFolderId(settings.driveFolderUrl);
+
+        // No folder configured — clear out any previously synced photos so the
+        // display falls back to the uploaded family photo.
+        if (!folderId) {
+            for (const entry of Object.values(manifest)) {
+                fs.unlink(path.join(DRIVE_DIR, entry.file), () => {});
+            }
+            fs.writeFileSync(DRIVE_MANIFEST_PATH, JSON.stringify({}, null, 2));
+            driveSyncStatus = { ok: null, message: 'No Drive folder set', lastSyncAt: null };
+            return;
+        }
+        if (!settings.driveApiKey) {
+            driveSyncStatus = { ok: false, message: 'Drive folder is set but the API key is missing', lastSyncAt: null };
+            return;
+        }
+
+        // If listing fails we bail out before touching anything on disk, so a
+        // network outage never wipes the photos that are already synced.
+        const remoteFiles = await listDriveFolderImages(folderId, settings.driveApiKey);
+        const remoteIds = new Set(remoteFiles.map(f => f.id));
+
+        let downloaded = 0, failed = 0;
+        for (const file of remoteFiles) {
+            const existing = manifest[file.id];
+            if (existing && existing.modifiedTime === file.modifiedTime &&
+                fs.existsSync(path.join(DRIVE_DIR, existing.file))) {
+                continue;
+            }
+            try {
+                const { buffer, contentType } = await downloadDriveImage(file, settings.driveApiKey);
+                const ext = DRIVE_DISPLAYABLE_MIME[contentType.split(';')[0].trim()] || 'jpg';
+                const filename = `${file.id}.${ext}`;
+                if (existing && existing.file !== filename) {
+                    fs.unlink(path.join(DRIVE_DIR, existing.file), () => {});
+                }
+                fs.writeFileSync(path.join(DRIVE_DIR, filename), buffer);
+                manifest[file.id] = { file: filename, name: file.name, modifiedTime: file.modifiedTime };
+                downloaded++;
+            } catch (err) {
+                failed++;
+                console.warn(`[${new Date().toISOString()}] Failed to download Drive photo ${file.name}:`, err.message);
+            }
+        }
+
+        let removed = 0;
+        for (const [id, entry] of Object.entries(manifest)) {
+            if (!remoteIds.has(id)) {
+                fs.unlink(path.join(DRIVE_DIR, entry.file), () => {});
+                delete manifest[id];
+                removed++;
+            }
+        }
+
+        fs.writeFileSync(DRIVE_MANIFEST_PATH, JSON.stringify(manifest, null, 2));
+
+        const total = Object.keys(manifest).length;
+        driveSyncStatus = {
+            ok: failed === 0,
+            message: `${total} photo${total === 1 ? '' : 's'} synced` + (failed ? ` (${failed} failed to download)` : ''),
+            lastSyncAt: new Date().toISOString(),
+        };
+        console.log(`[${new Date().toISOString()}] Drive sync: ${downloaded} new/updated, ${removed} removed, ${failed} failed, ${total} total`);
+    } catch (err) {
+        driveSyncStatus = { ...driveSyncStatus, ok: false, message: `Sync failed: ${err.message}` };
+        console.error(`[${new Date().toISOString()}] Drive sync failed, keeping existing photos:`, err.message);
+    } finally {
+        driveSyncInProgress = false;
+        if (driveSyncQueued) {
+            driveSyncQueued = false;
+            syncDrivePhotos();
+        }
+    }
+}
+
+// Slideshow photo URLs: the synced Drive photos if there are any, otherwise the
+// single uploaded family photo.
+function getSlideshowPhotos() {
+    const drivePhotos = Object.values(loadDriveManifest())
+        .filter(entry => fs.existsSync(path.join(DRIVE_DIR, entry.file)))
+        .map(entry => `/images/drive/${entry.file}`);
+    return drivePhotos.length ? drivePhotos : [`/images/${settings.photoFilename}`];
+}
+
 function msUntilNextMidnight() {
     const now = new Date();
     const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 5, 0); // 12:05am, small buffer
@@ -270,6 +468,8 @@ async function startServer() {
 
     scheduleStaticRefresh();                    // re-fetches once every 24h, aligned to midnight
     setInterval(refreshWeather, 15 * 60 * 1000); // every 15 min
+    syncDrivePhotos();                           // runs in the background; the server doesn't wait on it
+    setInterval(syncDrivePhotos, 15 * 60 * 1000);
 
     const server = http.createServer(async (req, res) => {
         const urlPath = req.url.split('?')[0]; // strip query string before routing/file resolution
@@ -328,8 +528,20 @@ async function startServer() {
         }
 
         if (urlPath === "/api/settings" && req.method === "GET") {
+            // The API key itself is never sent back to the browser — only whether one is set.
+            const { driveApiKey, ...publicSettings } = settings;
             res.writeHead(200, { "Content-Type": "application/json" });
-            res.end(JSON.stringify(settings));
+            res.end(JSON.stringify({ ...publicSettings, driveApiKeySet: !!driveApiKey }));
+            return;
+        }
+
+        if (urlPath === "/api/photos") {
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({
+                photos: getSlideshowPhotos(),
+                slideSeconds: settings.slideSeconds,
+                driveSyncStatus,
+            }));
             return;
         }
 
@@ -349,9 +561,23 @@ async function startServer() {
                     if (!/^\d{5}$/.test(incoming.zip)) {
                         throw new Error('Invalid zip');
                     }
-                    if (isNaN(incoming.havdalahMinutes) || incoming.havdalahMinutes < 0 || incoming.havdalahMinutes > 120) {
+                    if (isNaN(incoming.havdalahMinutes) || incoming.havdalahMinutes < 0 || incoming.havdalahMinutes > 72) {
                         throw new Error('Invalid havdalah minutes');
                     }
+
+                    const driveFolderUrl = (incoming.driveFolderUrl || '').trim();
+                    if (driveFolderUrl && !parseDriveFolderId(driveFolderUrl)) {
+                        throw new Error('That doesn\'t look like a Google Drive folder link');
+                    }
+                    const slideSeconds = Number(incoming.slideSeconds ?? settings.slideSeconds);
+                    if (!Number.isInteger(slideSeconds) || slideSeconds < 5 || slideSeconds > 3600) {
+                        throw new Error('Seconds per photo must be between 5 and 3600');
+                    }
+                    // A blank key field means "keep the current key" (the form never
+                    // receives the saved key, so it can't echo it back).
+                    const driveApiKey = (incoming.driveApiKey || '').trim() || settings.driveApiKey;
+
+                    const driveChanged = driveFolderUrl !== settings.driveFolderUrl || driveApiKey !== settings.driveApiKey;
 
                     // Spread existing settings first so fields not included in this
                     // request (e.g. photoFilename, only ever set by /api/photo) are
@@ -362,8 +588,13 @@ async function startServer() {
                         familyName,
                         zip: incoming.zip,
                         havdalahMinutes: incoming.havdalahMinutes,
+                        driveFolderUrl,
+                        driveApiKey,
+                        slideSeconds,
                     };
                     saveSettings(settings);
+
+                    if (driveChanged) syncDrivePhotos();
 
                     // Respond as soon as the settings are written, rather than
                     // making the person wait on a full Hebcal/weather refresh

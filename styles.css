@@ -263,6 +263,26 @@ p {
     object-fit: contain;
 }
 
+/* Slideshow crossfade — each photo (plus its blurred backdrop) is its own layer,
+   and the next one fades in on top of the current one, so the frame's metal
+   background never shows through mid-transition. Every slide fills the whole
+   frame (landscape photos cover it, portrait ones sit on their backdrop), so a
+   fully faded-in slide completely hides the one beneath it. */
+.photo-slide {
+    position: absolute;
+    inset: 0;
+    z-index: 1; /* own stacking context, so DOM order alone decides which slide is on top; stays under .photo-frame-shadow */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+}
+
+.photo-slide.visible {
+    opacity: 1;
+}
+
 .photo-frame-shadow {
     position: absolute;
     inset: 0;
@@ -769,6 +789,17 @@ p {
     letter-spacing: 0.05em;
     text-transform: none;
     color: var(--green);
+}
+
+.drive-sync-status {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.7rem;
+    color: var(--grey);
+}
+
+.drive-sync-status.error {
+    color: #b91c1c;
 }
 
 .photo-upload-row {

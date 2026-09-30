@@ -146,9 +146,30 @@ Click the gear icon in the bottom-right corner of the screen to open the setting
 | **Family name** (Hebrew) | The second word in the header (e.g. "אטיאס")                                                            |
 | **Zip code** | Location used for weather, zmanim, and the Hebrew calendar zmanim                                       |
 | **Minutes after shkiah for havdalah** | Havdalah calculation offset, applied both in the parasha box and the calendar's Shabbos/holiday entries |
-| **Family photo** | Uploads a new photo for the center display; automatically resized/compressed before upload              |
+| **Google Drive photo folder link** | A shared Drive folder whose photos play as a slideshow in the center frame (see below) |
+| **Google API key** | Key the server uses to read that folder. Never shown again after saving — leave blank to keep the saved key |
+| **Seconds per photo** | How long each slideshow photo stays up (5–3600) |
+| **Family photo** | Uploads a single photo for the center display, used whenever no Drive folder is set (or it has no photos yet); automatically resized/compressed before upload |
 
 Changes save immediately — the display refreshes itself within a few seconds without needing a manual page reload. A small status message near the Save button confirms success or reports any error (e.g. an invalid zip code).
+
+### Photo slideshow from Google Drive
+
+The server checks a Google Drive folder every 15 minutes, downloads any new or edited photos into `images/drive/`, and deletes local copies of photos removed from the folder. The display shuffles through them with a crossfade. Anyone who can add to the folder (from the Drive app on their phone, for example) can add photos to the screen.
+
+(Google Photos can't be used directly: since March 2025 its API no longer lets apps read your albums.)
+
+One-time setup:
+
+1. **Create the folder.** In Google Drive, create a folder (e.g. "Zmanim Screen Photos"). Click **Share → General access → Anyone with the link → Viewer**, then **Copy link**.
+2. **Create an API key.** At [console.cloud.google.com](https://console.cloud.google.com), create a project (any name). Go to **APIs & Services → Library**, search for **Google Drive API**, and click **Enable**. Then go to **APIs & Services → Credentials → Create credentials → API key**. On the key, click **Edit** and under **API restrictions** pick **Restrict key → Google Drive API** so the key can't be used for anything else. The Drive API is free at this usage level.
+3. **Enter both in settings.** Paste the folder link and the API key into the settings panel and click Save. The status line under the API key field shows how many photos synced, or the error from Google if something is wrong.
+
+Notes:
+
+- Photos are downloaded as ~1920px versions rather than full-size originals, which keeps disk use and the Pi's workload down. iPhone HEIC photos are converted to JPEG this way too.
+- Syncing runs on the server, so the slideshow keeps playing from local copies during internet outages.
+- To go back to the single uploaded photo, clear the folder link and save.
 
 ---
 
@@ -167,6 +188,7 @@ images/
   sample-family-photo.png  — default photo shown before any upload
   settings-icon.png        — gear icon for the settings button
   family-photo.<ext>       — the currently uploaded family photo, created after first upload
+  drive/                   — local copies of the Google Drive slideshow photos, plus manifest.json (managed by the server)
 ```
 
 ### Frontend / Backend split
@@ -318,3 +340,37 @@ Frontend-only changes (`index.html`, `styles.css`, `app.js`) just need the brows
 | Calendar still shows old candle-lighting times after changing zip | Should self-correct within a few seconds — the calendar explicitly re-fetches after a settings save. |
 | `scp`/`ssh` times out or says "destination host unreachable," even though the Pi is on and its IP is confirmed correct | Likely AP/client isolation on the router — a setting that blocks devices on the same Wi-Fi from reaching each other directly. Confirm with `ping` in both directions; if both fail, use the GitHub or USB transfer method instead (see [§2](#2-setting-up-the-app)). |
 | `git clone`/`git pull` says authentication failed | GitHub no longer accepts your account password for git — use a Personal Access Token in its place when prompted for a password (see [§2, Option B](#2-setting-up-the-app)). |
+
+---
+
+## 8. Using it as a screensaver on a Windows laptop
+
+`scripts/zmanim-screensaver.ps1` runs quietly in the background. After the laptop has had no keyboard or mouse input for a set time, it opens the Zmanim screen full-screen in Chrome's kiosk mode (Edge if Chrome isn't installed). The first keypress or mouse movement closes it again. It uses a separate browser profile, so it never touches your normal Chrome windows. It also won't start while a full-screen app (a video, a presentation) is in front.
+
+The page needs a server to load from: either run `node server.js` on the laptop (`http://localhost:8000`, the default), or pass `-Url http://<pi-ip-address>:8000` to show the Pi's screen when you're on the same network.
+
+**1. Try it by hand first.** From the project folder, in PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\zmanim-screensaver.ps1 -IdleMinutes 1
+```
+
+Leave the laptop alone for a minute; the screen should appear, and moving the mouse should close it. Press Ctrl+C in the PowerShell window to stop. (`-Test` instead just prints how long you've been idle, without opening anything.)
+
+**2. Start it automatically at log-on.** In PowerShell (no admin needed), from the project folder:
+
+```powershell
+$script  = (Resolve-Path scripts\zmanim-screensaver.ps1).Path
+$action  = New-ScheduledTaskAction -Execute "conhost.exe" -Argument "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$script`" -IdleMinutes 10"
+$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$options = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
+Register-ScheduledTask -TaskName "Zmanim Screensaver" -Action $action -Trigger $trigger -Settings $options
+```
+
+`conhost.exe --headless` keeps a console window from appearing. Change `-IdleMinutes 10` to your preferred timeout, and add `-Url http://<pi-ip-address>:8000` after it to use the Pi. To start it right away without logging out: `Start-ScheduledTask "Zmanim Screensaver"`.
+
+**To change or remove it:** `Unregister-ScheduledTask "Zmanim Screensaver" -Confirm:$false`, then register it again with new settings if needed. Stopping the task (`Stop-ScheduledTask "Zmanim Screensaver"`) turns it off until the next log-on.
+
+**Notes:**
+- Windows' own screen-off and sleep timers still apply. On battery, set **Settings → System → Power & battery → Screen, sleep & hibernate timeouts** so the screen turns off after a while even with the screensaver showing.
+- A video playing in a normal (not full-screen) window doesn't count as input, so the screensaver can come on over it after the timeout.

@@ -1,7 +1,10 @@
 <!DOCTYPE html>
-<html lang="he" dir="ltr">
+<html lang="he" dir="ltr" translate="no">
 <head>
     <meta charset="UTF-8" />
+    <!-- Stops Chrome's "Translate this page?" popup, which otherwise appears
+         because the page is Hebrew and the browser is set to English. -->
+    <meta name="google" content="notranslate" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Zmanim Screen</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -47,8 +50,7 @@
         <div class="bottomDivider"></div>
         <div class="photo-container">
             <div class="photo-inner">
-                <div class="photo-backdrop" id="photo-backdrop"></div>
-                <img id="family-photo" src="">
+                <!-- .photo-slide layers are added here by app.js -->
                 <div class="photo-frame-shadow"></div>
             </div>
         </div>
@@ -136,7 +138,23 @@
                 </div>
 
                 <div class="settings-field">
-                    <label for="photoInput">Family photo</label>
+                    <label for="driveFolderInput">Google Drive photo folder link</label>
+                    <input type="url" id="driveFolderInput" placeholder="https://drive.google.com/drive/folders/..." />
+                </div>
+
+                <div class="settings-field">
+                    <label for="driveApiKeyInput">Google API key</label>
+                    <input type="password" id="driveApiKeyInput" autocomplete="off" />
+                    <span id="driveSyncStatus" class="drive-sync-status"></span>
+                </div>
+
+                <div class="settings-field">
+                    <label for="slideSecondsInput">Seconds per photo</label>
+                    <input type="number" id="slideSecondsInput" min="5" max="3600" />
+                </div>
+
+                <div class="settings-field">
+                    <label for="photoInput">Family photo (shown when no Drive folder is set)</label>
                     <div class="photo-upload-row">
                         <img id="photoPreview" class="photo-preview" alt="" />
                         <label for="photoInput" class="photo-upload-btn">Choose File</label>

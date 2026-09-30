@@ -101,34 +101,173 @@ async function fetchData() {
         document.getElementById("havdalah-time").innerHTML =
             extractTimeFromTitle(data[6]?.havdalahObject?.title);
 
-        // Blurred backdrop logic
-        const img = document.getElementById('family-photo');
-        const backdrop = document.getElementById('photo-backdrop');
-
-        // Aspect ratio threshold — images with ratio below this get portrait treatment
-        // 1.0 = square, below 1.0 = portrait, above 1.0 = landscape
-        const THRESHOLD = 1.2;
-
-        img.onload = function() {
-            const ratio = img.naturalWidth / img.naturalHeight;
-
-            if (ratio < THRESHOLD) {
-                // Portrait — contain + blurred backdrop
-                img.style.objectFit = 'contain';
-                backdrop.style.backgroundImage = `url('${img.src}')`;
-                backdrop.style.display = 'block';
-            } else {
-                // Landscape — cover, no backdrop
-                img.style.objectFit = 'cover';
-                backdrop.style.display = 'none';
-            }
-        };
-
-        if (img.complete) img.onload();
-
     } catch (err) {
         console.error("Failed to fetch data:", err);
     }
+}
+
+// ── Photo slideshow ──────────────────────────────────────────────────────────
+// Plays the photo list from /api/photos (synced Google Drive photos, or the
+// single uploaded photo as a fallback), shuffled, crossfading between them.
+
+let slideshowPhotos = [];
+let slideshowOrder = [];
+let slideshowIndex = 0;
+let slideSeconds = 20;
+let slideTimer = null;
+
+// Aspect ratio threshold — images with ratio below this get portrait treatment
+// 1.0 = square, below 1.0 = portrait, above 1.0 = landscape
+const PORTRAIT_THRESHOLD = 1.2;
+
+// Builds one slide layer (blurred backdrop + photo) from an already-loaded image.
+function buildSlide(img, url) {
+    const slide = document.createElement('div');
+    slide.className = 'photo-slide';
+    slide.dataset.url = url;
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'photo-backdrop';
+
+    const ratio = img.naturalWidth / img.naturalHeight;
+    if (ratio < PORTRAIT_THRESHOLD) {
+        // Portrait — contain + blurred backdrop
+        img.style.objectFit = 'contain';
+        backdrop.style.backgroundImage = `url('${img.src}')`;
+        backdrop.style.display = 'block';
+    } else {
+        // Landscape — cover, no backdrop
+        img.style.objectFit = 'cover';
+    }
+
+    slide.append(backdrop, img);
+    return slide;
+}
+
+function shuffle(list) {
+    const copy = [...list];
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+}
+
+// Preloads and decodes the next photo before it starts fading in, so the
+// dissolve never shows a half-loaded image. The new slide fades in on top of
+// the current one, which is removed only once it's fully covered.
+function showPhoto(url) {
+    const inner = document.querySelector('.photo-inner');
+    const slides = inner.querySelectorAll('.photo-slide');
+    const current = slides[slides.length - 1];
+    if (current && current.dataset.url === url) return; // a reshuffle landed on the photo already showing
+
+    const preload = new Image();
+    preload.onload = async () => {
+        // Decode up front so the fade doesn't stutter. Capped, because decode()
+        // never settles while the page is hidden, which would stall the slideshow.
+        await Promise.race([preload.decode().catch(() => {}), new Promise(r => setTimeout(r, 1000))]);
+        const slide = buildSlide(preload, url);
+        const previous = [...inner.querySelectorAll('.photo-slide')];
+        inner.insertBefore(slide, inner.querySelector('.photo-frame-shadow'));
+
+        // First photo on page load (nothing to dissolve from), or the page is
+        // hidden (browsers pause transitions then, so a fade would stall
+        // half-done) — just swap. Without a style flush beforehand, adding
+        // .visible straight away makes the slide appear at full opacity.
+        if (!previous.length || document.hidden) {
+            slide.classList.add('visible');
+            previous.forEach(p => p.remove());
+            return;
+        }
+
+        // Keep only the photo currently on top as the underlay; anything older
+        // is already hidden beneath it. Bounds the layer count if fades stall
+        // (browsers pause transitions while the page is hidden).
+        previous.slice(0, -1).forEach(p => p.remove());
+
+        // The underlay is removed only once the new slide is fully opaque —
+        // never on a timer — so the frame's background can't show through.
+        slide.addEventListener('transitionend', () => {
+            previous.forEach(p => p.remove());
+        }, { once: true });
+
+        // Force a style flush so the slide registers at opacity 0 first —
+        // otherwise the transition is skipped and it just pops in.
+        void slide.offsetWidth;
+        slide.classList.add('visible');
+    };
+    preload.onerror = () => {
+        console.warn('Skipping photo that failed to load:', url);
+        if (slideshowOrder.length > 1) advanceSlideshow();
+    };
+    preload.src = url;
+}
+
+function advanceSlideshow() {
+    if (!slideshowOrder.length) return;
+    slideshowIndex++;
+    if (slideshowIndex >= slideshowOrder.length) {
+        slideshowOrder = shuffle(slideshowPhotos);
+        slideshowIndex = 0;
+    }
+    showPhoto(slideshowOrder[slideshowIndex]);
+}
+
+function restartSlideTimer() {
+    clearInterval(slideTimer);
+    if (slideshowPhotos.length > 1) {
+        slideTimer = setInterval(advanceSlideshow, slideSeconds * 1000);
+    }
+}
+
+// Picks up new/removed Drive photos without restarting the slideshow from
+// scratch — the current photo stays up unless it was removed.
+async function refreshPhotoList({ forceReload = false } = {}) {
+    try {
+        const res = await fetch('/api/photos');
+        if (!res.ok) throw new Error(`/api/photos returned ${res.status}`);
+        const data = await res.json();
+
+        const listChanged = data.photos.join('|') !== slideshowPhotos.join('|');
+        const timingChanged = data.slideSeconds !== slideSeconds;
+        slideSeconds = data.slideSeconds;
+
+        if (listChanged || forceReload) {
+            slideshowPhotos = data.photos;
+            const current = slideshowOrder[slideshowIndex];
+            slideshowOrder = shuffle(slideshowPhotos);
+            slideshowIndex = 0;
+
+            if (!forceReload && current && slideshowPhotos.includes(current)) {
+                // Keep showing the current photo; it becomes position 0 of the new order.
+                slideshowOrder = [current, ...slideshowOrder.filter(url => url !== current)];
+            } else {
+                // Cache-bust on a forced reload so a re-uploaded family photo
+                // with the same filename actually shows up.
+                const url = slideshowOrder[0];
+                showPhoto(forceReload ? `${url}?t=${Date.now()}` : url);
+            }
+            restartSlideTimer();
+        } else if (timingChanged) {
+            restartSlideTimer();
+        }
+
+        return data.driveSyncStatus;
+    } catch (err) {
+        console.error('Failed to load photo list:', err);
+        return null;
+    }
+}
+
+function renderDriveSyncStatus(status) {
+    const el = document.getElementById('driveSyncStatus');
+    if (!status) { el.textContent = ''; return; }
+    const when = status.lastSyncAt
+        ? ` · last sync ${new Date(status.lastSyncAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+        : '';
+    el.textContent = status.message + when;
+    el.classList.toggle('error', status.ok === false);
 }
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
@@ -248,6 +387,11 @@ async function loadSettingsIntoForm() {
         document.getElementById('zipInput').value          = settings.zip;
         document.getElementById('havdalahInput').value     = settings.havdalahMinutes;
         document.getElementById('photoPreview').src        = `/images/${settings.photoFilename}`;
+        document.getElementById('driveFolderInput').value  = settings.driveFolderUrl || '';
+        document.getElementById('slideSecondsInput').value = settings.slideSeconds;
+        const keyInput = document.getElementById('driveApiKeyInput');
+        keyInput.value = '';
+        keyInput.placeholder = settings.driveApiKeySet ? 'Saved — leave blank to keep' : 'Paste your API key';
     } catch (err) {
         console.error('Failed to load settings:', err);
     }
@@ -352,7 +496,7 @@ document.getElementById('settingsForm').addEventListener('submit', async functio
     try {
         photoFilename = await uploadPhotoIfSelected();
         if (photoFilename) {
-            document.getElementById('family-photo').src = `/images/${photoFilename}?t=${Date.now()}`;
+            await refreshPhotoList({ forceReload: true });
         }
     } catch (err) {
         console.error('Failed to upload photo:', err);
@@ -364,6 +508,9 @@ document.getElementById('settingsForm').addEventListener('submit', async functio
         familyName:      document.getElementById('familyNameInput').value.trim(),
         zip:             document.getElementById('zipInput').value.trim(),
         havdalahMinutes: parseInt(document.getElementById('havdalahInput').value, 10),
+        driveFolderUrl:  document.getElementById('driveFolderInput').value.trim(),
+        driveApiKey:     document.getElementById('driveApiKeyInput').value.trim(), // blank = keep saved key
+        slideSeconds:    parseInt(document.getElementById('slideSecondsInput').value, 10),
     };
 
     if (payload.mishpachasWord.length > 20 || payload.familyName.length > 20) {
@@ -388,6 +535,8 @@ document.getElementById('settingsForm').addEventListener('submit', async functio
 
         status.textContent = photoError ? `Saved ✓ (photo: ${photoError})` : 'Saved ✓';
         await fetchData();
+        renderDriveSyncStatus(await refreshPhotoList());
+        loadSettingsIntoForm(); // clears the key field and updates its "Saved" placeholder
 
         if (window.zmanimCalendar) {
             window.zmanimCalendar.refetchEvents();
@@ -405,6 +554,12 @@ document.getElementById('settingsForm').addEventListener('submit', async functio
             }
         }, 3000);
 
+        // A Drive folder change kicks off a sync that downloads every photo,
+        // which takes longer than the zmanim refresh — check back a few times.
+        [10000, 30000, 90000].forEach(delay => setTimeout(async () => {
+            renderDriveSyncStatus(await refreshPhotoList());
+        }, delay));
+
         setTimeout(() => { status.textContent = ''; }, 2000);
     } catch (err) {
         console.error('Failed to save settings:', err);
@@ -420,10 +575,12 @@ updateClock();
 fetchData();
 setInterval(fetchData, 15 * 60 * 1000); // matches the server's weather refresh cadence
 
+refreshPhotoList();
+setInterval(refreshPhotoList, 5 * 60 * 1000); // picks up newly synced Drive photos
+
 loadSettingsIntoForm().then(() => {
     document.getElementById('mishpachas-word').textContent = document.getElementById('mishpachasInput').value;
     document.getElementById('family-name-text').textContent = document.getElementById('familyNameInput').value;
-    document.getElementById('family-photo').src = document.getElementById('photoPreview').src;
 });
 
 // Get the modal
@@ -439,6 +596,7 @@ var span = document.getElementsByClassName("close")[0];
 btn.onclick = function() {
     modal.style.display = "flex";
     loadSettingsIntoForm();
+    refreshPhotoList().then(renderDriveSyncStatus);
 }
 
 // When the user clicks on <span> (x), close the modal
